@@ -2,17 +2,24 @@
 import { Connection } from './webrtc'
 
 export default {
-  data(): { connection: Connection | null; } {
+  data(): { connection: Connection; connectionState: RTCPeerConnectionState, connectButtonDisable: boolean } {
     return {
-      connection: null
+      connection: new Connection(),
+      connectionState: 'closed',
+      connectButtonDisable: false,
     }
   },
 
   // `mounted` 是生命周期钩子，之后我们会讲到
   mounted() {
-    this.connection = new Connection()
     //@ts-ignore
     window.connection = this.connection
+    this.connection.on('connection-state-changed', state => {
+      this.connectionState = state;
+      if (this.connectionState === 'connecting' || this.connectionState === 'connected') {
+        this.connectButtonDisable = true;
+      }
+    })
     const search = new URLSearchParams(location.search)
     this.connection.join(search.get('roomId') || '123')
   },
@@ -20,6 +27,12 @@ export default {
   methods: {
     connect() {
       this.connection?.connect()
+    },
+    onFileChange() {
+      const fileInput = this.$refs.fileInput as HTMLInputElement
+      if (fileInput.files && fileInput.files[0]) {
+        this.connection.sendFile(fileInput.files[0])
+      }
     }
   }
 }
@@ -29,7 +42,12 @@ export default {
   <div>
     <div>my userId: {{ connection?._localUser }}</div>
     <div>remote userId: {{ connection?._remoteUser }}</div>
-    <button @click="connect()">connect</button>
+    <div>connection state: {{ connectionState }}</div>
+    <div>
+      选择文件：
+    </div>
+    <input type="file" @change="onFileChange" ref="fileInput"/>
+    <button :disabled="connectButtonDisable" @click="connect()">connect</button>
   </div>
 </template>
 

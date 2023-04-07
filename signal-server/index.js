@@ -30,6 +30,6 @@ io.on('connection', (socket) => {
   console.log('a user connected');
 });
 
-server.listen(3000, () => {
+server.listen(3000, '192.168.123.111', () => {
   console.log('listening on *:3000');
 });
