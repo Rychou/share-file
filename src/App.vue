@@ -1,12 +1,14 @@
 <script lang="ts">
-import { Connection } from './webrtc'
+import { Connection, FileReceiver } from './webrtc'
 
 export default {
-  data(): { connection: Connection; connectionState: RTCPeerConnectionState, connectButtonDisable: boolean } {
+  data(): { connection: Connection; connectionState: RTCPeerConnectionState, connectButtonDisable: boolean, fileReceiverList: FileReceiver[], maxSize: number } {
     return {
       connection: new Connection(),
       connectionState: 'closed',
       connectButtonDisable: false,
+      fileReceiverList: [],
+      maxSize: 0,
     }
   },
 
@@ -18,7 +20,17 @@ export default {
       this.connectionState = state;
       if (this.connectionState === 'connecting' || this.connectionState === 'connected') {
         this.connectButtonDisable = true;
+        this.maxSize = this.connection.maxSize;
       }
+    })
+    this.connection.on('receive-file-started', fileReceiver => {
+      this.fileReceiverList.push(fileReceiver);
+    })
+    this.connection.on('receive-file-ing', fileReceiver => {
+      this.fileReceiverList = this.fileReceiverList.map(item => item.id === fileReceiver.id ? fileReceiver : item)
+    })
+    this.connection.on('receive-file-done', fileReceiver => {
+      this.fileReceiverList = this.fileReceiverList.map(item => item.id === fileReceiver.id ? fileReceiver : item)
     })
     const search = new URLSearchParams(location.search)
     this.connection.join(search.get('roomId') || '123')
@@ -43,11 +55,18 @@ export default {
     <div>my userId: {{ connection?._localUser }}</div>
     <div>remote userId: {{ connection?._remoteUser }}</div>
     <div>connection state: {{ connectionState }}</div>
-    <div>
-      选择文件：
-    </div>
-    <input type="file" @change="onFileChange" ref="fileInput"/>
+    <div>maxSize: {{ maxSize }}</div>
     <button :disabled="connectButtonDisable" @click="connect()">connect</button>
+
+    <div>
+      <div>选择文件：<input type="file" @change="onFileChange" ref="fileInput"/></div>
+      <div>收到文件：
+        <div v-for="fileReceiver in fileReceiverList" :key="fileReceiver.id">
+          <span>{{ fileReceiver.name }}</span>  <span>{{ (fileReceiver.size / 1000 / 1000).toFixed(2) }} MB</span> <span>{{ (fileReceiver.receivedSize / 1000 / 1000).toFixed(2) }} MB</span>
+          <button v-if="fileReceiver.isDone" @click="fileReceiver.download()">Donwload</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
