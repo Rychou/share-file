@@ -2,13 +2,15 @@
 import { Connection, FileReceiver } from './webrtc'
 
 export default {
-  data(): { connection: Connection; connectionState: RTCPeerConnectionState, connectButtonDisable: boolean, fileReceiverList: FileReceiver[], maxSize: number } {
+  data(): { connection: Connection; connectionState: RTCPeerConnectionState, connectButtonDisable: boolean, fileReceiverList: FileReceiver[], maxSize: number, sendBitrate: number, receiveBitrate: number } {
     return {
       connection: new Connection(),
       connectionState: 'closed',
       connectButtonDisable: false,
       fileReceiverList: [],
       maxSize: 0,
+      sendBitrate: 0,
+      receiveBitrate: 0
     }
   },
 
@@ -31,6 +33,10 @@ export default {
     })
     this.connection.on('receive-file-done', fileReceiver => {
       this.fileReceiverList = this.fileReceiverList.map(item => item.id === fileReceiver.id ? fileReceiver : item)
+    })
+    this.connection.on('stats', ({ sendBitrate, receiveBitrate }) => {
+      this.sendBitrate = sendBitrate;
+      this.receiveBitrate = receiveBitrate;
     })
     const search = new URLSearchParams(location.search)
     this.connection.join(search.get('roomId') || '123')
@@ -56,6 +62,8 @@ export default {
     <div>remote userId: {{ connection?._remoteUser }}</div>
     <div>connection state: {{ connectionState }}</div>
     <div>maxSize: {{ maxSize }}</div>
+    <div>sendBitrate: {{ (sendBitrate / 1000 / 1000).toFixed(2) }} Mbps {{ (sendBitrate / 1000 / 1000 / 8).toFixed(2) }} MBps</div>
+    <div>receiveBitrate: {{ (receiveBitrate / 1000 / 1000).toFixed(2) }} Mbps {{ (receiveBitrate / 1000 / 1000 / 8).toFixed(2) }} MBps</div>
     <button :disabled="connectButtonDisable" @click="connect()">connect</button>
 
     <div>

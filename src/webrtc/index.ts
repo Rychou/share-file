@@ -11,6 +11,7 @@ interface ConnectionEventTypes {
   'receive-file-started': (fileReceiver: FileReceiver) => void;
   'receive-file-ing': (fileReceiver: FileReceiver) => void;
   'receive-file-done': (fileReceiver: FileReceiver) => void;
+  'stats': (stats: { sendBitrate: number; receiveBitrate: number }) => void;
 }
 
 interface FileItem {
@@ -55,7 +56,8 @@ export class FileReceiver extends EventEmitter {
   }
 }
 
-const SERVER_URL = "http://192.168.123.111:3000";
+const SERVER_URL = "http://43.163.217.75:3000";
+// const SERVER_URL = "http://192.168.123.111:3000";
 export class Connection extends EventEmitter<ConnectionEventTypes> {
   _peerConnection: RTCPeerConnection;
   _sendChannel: RTCDataChannel | null = null;
@@ -64,6 +66,9 @@ export class Connection extends EventEmitter<ConnectionEventTypes> {
   _localUser?: string;
   _remoteUser?: string;
   connectionState: RTCPeerConnectionState = 'closed';
+
+  bytesSent = 0;
+  bytesReceived = 0;
 
   fileReceiverMap: Map<number, FileReceiver> = new Map();
   receivingFileId: number = -1;
@@ -112,6 +117,25 @@ export class Connection extends EventEmitter<ConnectionEventTypes> {
     this._peerConnection.onconnectionstatechange = (event) => {
       this.connectionState = this._peerConnection.connectionState;
       if (this.connectionState === 'connected') {
+        setInterval(async () => {
+          const stats = await this._peerConnection.getStats();
+          const prevBytesSent = this.bytesSent;
+          const prevBytesReceived = this.bytesReceived;
+          stats.forEach(item => {
+            if (item.type === 'data-channel') {
+              if (item.bytesSent > 0) {
+                this.bytesSent = item.bytesSent;
+              }
+              if (item.bytesReceived) {
+                this.bytesReceived = item.bytesReceived;
+              }
+            }
+          });
+          const sendBitrate = (this.bytesSent - prevBytesSent) * 8;
+          const receiveBitrate = (this.bytesReceived - prevBytesReceived) * 8;
+          console.warn(sendBitrate, receiveBitrate);
+          this.emit('stats', { sendBitrate, receiveBitrate });
+        }, 1000)
         const match = this._peerConnection.remoteDescription!.sdp.match(/a=max-message-size:\s*(\d+)/);
         if (match && match[1]) {
           this.maxSize = Number(match[1]);
