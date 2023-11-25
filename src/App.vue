@@ -15,7 +15,8 @@ export default {
     receiveBitrate: number
     roomId: string
     qrcode: string
-    stepIndex: number
+    stepIndex: number,
+    isClipboardSupported: boolean;
   } {
     return {
       connection: new Connection(),
@@ -27,13 +28,14 @@ export default {
       receiveBitrate: 0,
       roomId: String(Math.floor(Math.random() * 100000)),
       qrcode: '',
-      stepIndex: 0
+      stepIndex: 0,
+      isClipboardSupported: !!window.navigator.clipboard
     }
   },
 
   computed: {
     url() {
-      return `${location.href}?roomId=${this.roomId}&autoConnect=1`
+      return `${location.href}?roomId=${this.roomId}`
     }
   },
 
@@ -119,16 +121,24 @@ export default {
 
 <template>
   <div class="wrapper">
-    <van-notice-bar color="#1989fa" background="#ecf9ff" left-icon="info-o" wrapable :scrollable="false">
-      {{ (() => {
-        if (stepIndex === 0) {
-          return '在两台设备的浏览器中打开相同地址，可扫码二维码或者复制链接。'
-        } else if (stepIndex === 1) {
-          return '该步骤需要设备网络能正常访问互联网'
-        } else {
-          return '该步骤是 P2P 传输，若是通过手机热点连接，可以关闭移动数据，避免消耗流量。'
-        }
-      })() }}
+    <van-notice-bar
+      color="#1989fa"
+      background="#ecf9ff"
+      left-icon="info-o"
+      wrapable
+      :scrollable="false"
+    >
+      {{
+        (() => {
+          if (stepIndex === 0) {
+            return '在两台设备的浏览器中打开相同地址，可扫码二维码或者复制链接。'
+          } else if (stepIndex === 1) {
+            return '该步骤需要设备网络能正常访问互联网'
+          } else {
+            return '该步骤是 P2P 传输，若是通过手机热点连接，可以关闭移动数据，避免消耗流量。'
+          }
+        })()
+      }}
     </van-notice-bar>
     <van-steps :active="stepIndex">
       <van-step>双方进入同一个链接</van-step>
@@ -138,11 +148,14 @@ export default {
 
     <div class="main-wrapper">
       <div v-if="!connection?._remoteUser" class="share">
-        <div>
+        <div class="center-flex">
           <img v-if="qrcode" :src="qrcode" />
         </div>
-        <div class="share-link">
-          <van-button @click="share()">复制链接</van-button>
+        <div class="share-link flex-direction-colume">
+          <div>{{ url }}</div>
+          <div v-if="isClipboardSupported">
+            <van-button type="primary" @click="share()">复制链接</van-button>
+          </div>
         </div>
       </div>
       <!-- <button :disabled="connectButtonDisable" @click="connect()">connect</button> -->
@@ -201,6 +214,7 @@ export default {
 /* div {
   width: 100%;
 } */
+.center-flex,
 .main-wrapper,
 .transfer-wrapper,
 .share-link {
@@ -208,6 +222,7 @@ export default {
   justify-content: center;
   align-items: center;
 }
+.flex-direction-colume,
 .transfer-wrapper {
   flex-direction: column;
 }
