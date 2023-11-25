@@ -7,6 +7,7 @@ const ConnectionEvent = {
 }
 
 interface ConnectionEventTypes {
+  'user-join': () => void;
   'connection-state-changed': (connectionState: RTCPeerConnectionState) => void;
   'receive-file-started': (fileReceiver: FileReceiver) => void;
   'receive-file-ing': (fileReceiver: FileReceiver) => void;
@@ -53,10 +54,12 @@ export class FileReceiver extends EventEmitter {
     a.href = URL.createObjectURL(blob);
     a.download = this.name;
     a.click();
+    URL.revokeObjectURL(a.href);
   }
 }
 
-const SERVER_URL = "http://43.163.217.75:3000";
+const SERVER_URL = "http://localhost:3000";
+// const SERVER_URL = "http://43.163.217.75:3000";
 // const SERVER_URL = "http://192.168.123.111:3000";
 export class Connection extends EventEmitter<ConnectionEventTypes> {
   _peerConnection: RTCPeerConnection;
@@ -90,7 +93,10 @@ export class Connection extends EventEmitter<ConnectionEventTypes> {
         credential: '123456'
       }]
     });
-    this._socket.on('connect', () => this._localUser = this._socket.id);
+    this._socket.on('connect', () => {
+      this._localUser = this._socket.id
+      console.warn('local userId', this._localUser)
+    });
     this._socket.on('candidate', (candidate) => {
       console.warn('on remote candidate ', candidate);
       this._peerConnection.addIceCandidate(candidate);
@@ -98,6 +104,7 @@ export class Connection extends EventEmitter<ConnectionEventTypes> {
     this._socket.on('user-join', userId => {
       this._remoteUser = userId;
       console.warn('remote user join: ', userId);
+      this.emit('user-join')
     })
     this._socket.on('offer', async (offer) => {
       await this._peerConnection.setRemoteDescription(offer);
@@ -217,7 +224,7 @@ export class Connection extends EventEmitter<ConnectionEventTypes> {
         // @ts-ignore
         this._sendChannel.send(data);
       } catch (error) {
-        debugger;
+        // debugger;
       }
     } else {
       await this.waitSendChannelAbleToSend();

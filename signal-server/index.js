@@ -12,9 +12,18 @@ app.get('/', (req, res) => {
 io.on('connection', (socket) => {
   socket.on('join', async (roomId) => {
     await socket.join(roomId);
+    console.warn('user joined ', socket.id)
     socket.roomId = roomId;
-    socket.in(roomId).emit('user-join', socket.id);
-    console.warn(socket.rooms);
+    // socket.in(roomId).emit('user-join', socket.id);
+    const sockets = await io.in(roomId).fetchSockets();
+    console.warn(sockets.map(socket => socket.id), socket.id);
+    const otherSocket = sockets.find(item => item.id !== socket.id);
+    console.warn(otherSocket);
+    if (otherSocket) {
+      socket.emit('user-join', otherSocket.id);
+      otherSocket.emit('user-join', socket.id);
+    }
+    // console.warn(socket.rooms);
   })
   socket.on('offer', data => {
     console.log('receive offer')
@@ -27,9 +36,9 @@ io.on('connection', (socket) => {
   socket.on('candidate', data => {
     socket.in(socket.roomId).emit('candidate', data);
   })
-  console.log('a user connected');
+  console.log('a user connected, ' + socket.id);
 });
 
-server.listen(3000, '192.168.123.111', () => {
+server.listen(3000, 'localhost', () => {
   console.log('listening on *:3000');
 });
