@@ -1,6 +1,7 @@
 import { io, Socket } from "socket.io-client";
 import EventEmitter from 'eventemitter3';
 import { reactive } from "vue";
+import { showToast } from "vant";
 
 const ConnectionEvent = {
   CONNECTION_STATE_CHANGED: 'connectionStateChanged'
@@ -117,6 +118,9 @@ export class Connection extends EventEmitter<ConnectionEventTypes> {
     })
     this._socket.on('answer', (answer) => {
       this._peerConnection.setRemoteDescription(answer);
+    })
+    this._socket.on('error', message => {
+      showToast(message);
     })
     this._peerConnection.ondatachannel = event => {
       this._receiveChannel = event.channel;

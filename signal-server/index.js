@@ -11,6 +11,11 @@ app.get('/', (req, res) => {
 
 io.on('connection', (socket) => {
   socket.on('join', async (roomId) => {
+    const currentSockets = await io.sockets.fetchSockets()
+    if (currentSockets.length >= 10) {
+      socket.emit('error', `more than 10 users are out of services, current users: ${currentSockets.length}`)
+      return
+    }
     await socket.join(roomId);
     console.warn('user joined ', socket.id)
     socket.roomId = roomId;
