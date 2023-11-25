@@ -90,7 +90,7 @@ export default {
     if (urlRoomId) {
       this.roomId = urlRoomId
     }
-    QRCode.toDataURL(this.url).then((res) => {
+    QRCode.toDataURL(this.url).then((res: string) => {
       this.qrcode = res
     })
     this.connection.join(this.roomId)
