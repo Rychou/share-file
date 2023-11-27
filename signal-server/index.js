@@ -21,9 +21,7 @@ io.on('connection', (socket) => {
     socket.roomId = roomId;
     // socket.in(roomId).emit('user-join', socket.id);
     const sockets = await io.in(roomId).fetchSockets();
-    console.warn(sockets.map(socket => socket.id), socket.id);
     const otherSocket = sockets.find(item => item.id !== socket.id);
-    console.warn(otherSocket);
     if (otherSocket) {
       socket.emit('user-join', otherSocket.id);
       otherSocket.emit('user-join', socket.id);
@@ -40,6 +38,10 @@ io.on('connection', (socket) => {
   })
   socket.on('candidate', data => {
     socket.in(socket.roomId).emit('candidate', data);
+  })
+  socket.on('disconnect', () => {
+    console.warn('user-leave', socket.id)
+    socket.in(socket.roomId).emit('user-leave', socket.id);
   })
   console.log('a user connected, ' + socket.id);
 });

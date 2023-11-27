@@ -4,6 +4,10 @@ import { showNotify, showLoadingToast, type ToastWrapperInstance, showSuccessToa
 // @ts-ignore
 import QRCode from 'qrcode'
 
+window.onunhandledrejection = event => {
+  showNotify(event.reason)
+}
+
 export default {
   data(): {
     connection: Connection
@@ -35,7 +39,7 @@ export default {
 
   computed: {
     url() {
-      return `${location.href}?roomId=${this.roomId}`
+      return `${location.origin}?roomId=${this.roomId}`
     }
   },
 
@@ -147,7 +151,7 @@ export default {
     </van-steps>
 
     <div class="main-wrapper">
-      <div v-if="!connection?._remoteUser" class="share">
+      <div v-if="stepIndex === 0" class="share">
         <div class="center-flex">
           <img v-if="qrcode" :src="qrcode" />
         </div>
@@ -160,14 +164,14 @@ export default {
       </div>
       <!-- <button :disabled="connectButtonDisable" @click="connect()">connect</button> -->
       <div
-        v-if="connection?._remoteUser && connectionState !== 'connected'"
+        v-if="stepIndex === 1"
         class="connect-wrapper"
       >
         <div></div>
         <van-button @click="connect()">连接</van-button>
       </div>
 
-      <div v-if="connectionState === 'connected'" class="transfer-wrapper">
+      <div v-if="stepIndex === 2" class="transfer-wrapper">
         <!-- <div>maxSize: {{ maxSize }}</div> -->
         <div>上行速率: {{ (sendBitrate / 1000 / 1000 / 8).toFixed(2) }} MB/s</div>
         <div>下行速率: {{ (receiveBitrate / 1000 / 1000 / 8).toFixed(2) }} MB/s</div>
@@ -180,10 +184,12 @@ export default {
             style="margin: 0 auto; display: block"
           >
           </van-button>
+          <video v-if="connection.sendDataURL.length > 0" :src="connection.sendDataURL" style="width: 320px;height: 240px;object-fit: contain;" controls></video>
+
           <div v-if="fileReceiverList.length">
             <div v-for="fileReceiver in fileReceiverList" :key="fileReceiver.id">
               <div style="display: flex; align-items: baseline">
-                <span>{{ fileReceiver.name }}</span>
+                <span style="max-width: 300px;" class="text-overflow">{{ fileReceiver.name }}</span>
                 <span style="margin: 0 6px"
                   >{{ (fileReceiver.size / 1000 / 1000).toFixed(2) }} MB</span
                 >
@@ -199,6 +205,7 @@ export default {
                 style="margin: 6px 0"
                 :percentage="Math.floor((fileReceiver.receivedSize / fileReceiver.size) * 100)"
               />
+              <video v-if="fileReceiver.isDone && fileReceiver.name.includes('.mp4')" :src="fileReceiver.getDataURL()" style="width: 320px;height: 240px;object-fit: contain;" controls></video>
             </div>
           </div>
         </div>
@@ -225,5 +232,10 @@ export default {
 .flex-direction-colume,
 .transfer-wrapper {
   flex-direction: column;
+}
+.text-overflow {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 </style>

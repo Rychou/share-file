@@ -27,11 +27,12 @@ interface FileItemMeta extends FileItem {
 let fileReceiverSeq = 0
 export class FileReceiver extends EventEmitter {
   id = ++fileReceiverSeq;
+  seq = 0;
   receiveBuffer: ArrayBuffer[] = [];
   name: string;
   size: number;
   isDone = false;
-
+  dataURL = ''
   receivedSize = 0;
 
   constructor(fileItemMeta: FileItemMeta) {
@@ -40,9 +41,26 @@ export class FileReceiver extends EventEmitter {
     this.size = fileItemMeta.size;
   }
 
+  getDataURL() {
+    if (this.dataURL.length > 0) return this.dataURL
+    if (this.isDone) {
+      const blob = new Blob(this.receiveBuffer);
+      this.dataURL = URL.createObjectURL(blob);
+    }
+    return this.dataURL;
+  }
+
   addData(data: ArrayBuffer) {
-    this.receiveBuffer.push(data);
-    this.receivedSize += data.byteLength;
+    const uin8Array = new Uint8Array(data);
+    const seq = new DataView(data).getUint16(0, false);
+    console.warn(seq, this.seq);
+    if (seq - this.seq !== 1) {
+      console.error(seq, this.seq)
+    }
+    this.seq = seq;
+    const fileData = uin8Array.slice(2).buffer;
+    this.receiveBuffer.push(fileData);
+    this.receivedSize += fileData.byteLength;
   }
 
   download() {
@@ -50,12 +68,10 @@ export class FileReceiver extends EventEmitter {
       console.error('file receiver is not done yet!');
       return;
     }
-    const blob = new Blob(this.receiveBuffer);
     const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
+    a.href = this.getDataURL();
     a.download = this.name;
     a.click();
-    URL.revokeObjectURL(a.href);
   }
 }
 
@@ -82,6 +98,8 @@ export class Connection extends EventEmitter<ConnectionEventTypes> {
   maxSize = 0;
 
   sendChannelAvailablePromise: Promise<void> | null = null;
+  sendArrayBuffer: ArrayBuffer[] = [];
+  sendDataURL = '';
   get isSendChannelAvailable() {
     if (!this._sendChannel) return false;
     return this._sendChannel.bufferedAmount <= this._sendChannel.bufferedAmountLowThreshold;
@@ -107,7 +125,12 @@ export class Connection extends EventEmitter<ConnectionEventTypes> {
     this._socket.on('user-join', userId => {
       this._remoteUser = userId;
       console.warn('remote user join: ', userId);
+      showToast({ type: 'text', message: `user-join ${userId}`})
       this.emit('user-join')
+    })
+    this._socket.on('user-leave', userId => {
+      showToast({ type: 'text', message: `user-leave ${userId}`})
+      this._remoteUser = undefined;
     })
     this._socket.on('offer', async (offer) => {
       await this._peerConnection.setRemoteDescription(offer);
@@ -146,14 +169,13 @@ export class Connection extends EventEmitter<ConnectionEventTypes> {
           });
           const sendBitrate = (this.bytesSent - prevBytesSent) * 8;
           const receiveBitrate = (this.bytesReceived - prevBytesReceived) * 8;
-          console.warn(sendBitrate, receiveBitrate);
           this.emit('stats', { sendBitrate, receiveBitrate });
         }, 1000)
         const match = this._peerConnection.remoteDescription!.sdp.match(/a=max-message-size:\s*(\d+)/);
         if (match && match[1]) {
           this.maxSize = Number(match[1]);
           if (this._sendChannel) {
-            this._sendChannel.bufferedAmountLowThreshold = this.maxSize;
+            this._sendChannel.bufferedAmountLowThreshold = this.maxSize * 16;
           }
         }
       }
@@ -225,10 +247,16 @@ export class Connection extends EventEmitter<ConnectionEventTypes> {
   // FIXME: Android 和 iOS 互传，速度比较慢 1M/s
   async send(data: ArrayBuffer | string) {
     if (!this._sendChannel) return;
+    // console.warn(this._sendChannel.bufferedAmount, this._sendChannel.bufferedAmountLowThreshold)
     if (this.isSendChannelAvailable) {
       try {
         // @ts-ignore
-        this._sendChannel.send(data);
+        if (data instanceof ArrayBuffer && this.sendArrayBuffer.length > 0) {
+          console.warn(new DataView(data).getUint16(0))
+          this._sendChannel.send(this.sendArrayBuffer.shift()!);
+        } else {
+          this._sendChannel.send(data as string)
+        }
       } catch (error) {
         // debugger;
       }
@@ -243,6 +271,7 @@ export class Connection extends EventEmitter<ConnectionEventTypes> {
 
     const fileReader = reactive(new FileReader());
     let offset = 0;
+    let index = 0;
     const chunkSize = 256 * 1024;
     const metaInfo: FileItemMeta = {
       type: 'meta',
@@ -254,7 +283,12 @@ export class Connection extends EventEmitter<ConnectionEventTypes> {
     fileReader.addEventListener('abort', event => console.log('File reading aborted:', event));
     fileReader.addEventListener('load', e => {
       if (this._sendChannel && e.target && e.target.result && e.target.result instanceof ArrayBuffer) {
-        this.send(e.target.result);
+        index++;
+        const data = new Uint8Array(2 + e.target.result.byteLength);
+        new DataView(data.buffer).setUint16(0, index)
+        data.set(new Uint8Array(e.target.result), 2);
+        this.sendArrayBuffer.push(data.buffer);
+        this.send(data.buffer);
         offset += e.target.result.byteLength;
       }
 
@@ -267,14 +301,14 @@ export class Connection extends EventEmitter<ConnectionEventTypes> {
     });
     const readSlice = (o: any) => {
       // console.log('readSlice ', o);
-      const slice = file.slice(offset, o + chunkSize);
+      const slice = file.slice(offset, o + chunkSize - 2);
       fileReader.readAsArrayBuffer(slice);
     };
     readSlice(0);
   }
 
   onReceiveData(event: any) {
-    console.warn('receive message: ' + event.data)
+    // console.warn('receive message: ' + event.data)
     if (typeof event.data === 'string') {
       const fileItem: FileItem | FileItemMeta = JSON.parse(event.data);
       if (fileItem.type === 'meta') {
