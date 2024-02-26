@@ -79,7 +79,7 @@ const IS_LOCAL = location.hostname.includes('localhost') || location.hostname.in
 // const SERVER_URL = "http://localhost:3000";
 // const SERVER_URL = "http://43.163.217.75:3000";
 // const SERVER_URL = "http://192.168.123.111:3000";
-const SERVER_URL = `http://${IS_LOCAL ? location.hostname : '43.163.217.75'}:3000`;
+const SERVER_URL = `http://${location.hostname}:3000`;
 export class Connection extends EventEmitter<ConnectionEventTypes> {
   _peerConnection: RTCPeerConnection;
   _sendChannel: RTCDataChannel | null = null;
@@ -109,7 +109,7 @@ export class Connection extends EventEmitter<ConnectionEventTypes> {
     this._socket = io(SERVER_URL);
     this._peerConnection = new RTCPeerConnection({
       iceServers: [{
-        urls: ['stun:43.163.217.75:3478'],
+        urls: [`stun:${location.hostname}:3478`],
         username: 'admin',
         credential: '123456'
       }]
